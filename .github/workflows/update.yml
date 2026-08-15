@@ -1,0 +1,54 @@
+name: Update
+
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fetch zone files
+        run: |
+          curl -fsSL --retry 3 --retry-delay 5 \
+            https://www.ipdeny.com/ipblocks/data/countries/ru.zone -o /tmp/ipv4.txt
+          curl -fsSL --retry 3 --retry-delay 5 \
+            https://www.ipdeny.com/ipv6/ipaddresses/blocks/ru.zone -o /tmp/ipv6.txt
+
+      - name: Validate
+        run: |
+          # Every line must be a bare CIDR; guards against ipdeny serving an error page
+          grep -qvE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$' /tmp/ipv4.txt \
+            && { echo "::error::ipv4.txt contains non-CIDR lines"; exit 1; }
+          grep -qvE '^[0-9a-fA-F:]+/[0-9]{1,3}$' /tmp/ipv6.txt \
+            && { echo "::error::ipv6.txt contains non-CIDR lines"; exit 1; }
+          v4=$(wc -l < /tmp/ipv4.txt)
+          v6=$(wc -l < /tmp/ipv6.txt)
+          echo "ipv4: $v4 lines, ipv6: $v6 lines"
+          [ "$v4" -ge 5000 ] || { echo "::error::ipv4.txt suspiciously small ($v4 lines)"; exit 1; }
+          [ "$v6" -ge 500 ] || { echo "::error::ipv6.txt suspiciously small ($v6 lines)"; exit 1; }
+
+      - name: Commit if changed
+        run: |
+          mv /tmp/ipv4.txt ipv4.txt
+          mv /tmp/ipv6.txt ipv6.txt
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ipv4.txt ipv6.txt
+          git commit -m "update $(date -u +%Y-%m-%d)"
+          git push
