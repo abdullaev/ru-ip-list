@@ -2,7 +2,10 @@ name: Update
 
 on:
   schedule:
-    - cron: "30 4 * * *"
+    # ipdeny regenerates the zone files mid-morning UTC (observed 10:14 and
+    # 10:27 GMT); 12:00 clears that with margin. Running earlier just refetched
+    # the previous day's file.
+    - cron: "0 12 * * *"
   workflow_dispatch:
 
 permissions:
