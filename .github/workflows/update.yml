@@ -21,9 +21,11 @@ jobs:
 
       - name: Fetch zone files
         run: |
-          curl -fsSL --retry 3 --retry-delay 5 \
+          # --http1.1: ipdeny has served mid-transfer HTTP/2 PROTOCOL_ERRORs (curl 92)
+          # --retry-all-errors: plain --retry skips non-transient exits like 92
+          curl -fsSL --http1.1 --retry 3 --retry-delay 5 --retry-all-errors \
             https://www.ipdeny.com/ipblocks/data/countries/ru.zone -o /tmp/ipv4.txt
-          curl -fsSL --retry 3 --retry-delay 5 \
+          curl -fsSL --http1.1 --retry 3 --retry-delay 5 --retry-all-errors \
             https://www.ipdeny.com/ipv6/ipaddresses/blocks/ru.zone -o /tmp/ipv6.txt
 
       - name: Validate
